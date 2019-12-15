@@ -189,30 +189,37 @@ void updateBody() {
   double* force1 = new double[NumberOfBodies];
   double* force2 = new double[NumberOfBodies];
 
+  for (int i=0; i<NumberOfBodies; i++) {
+    force0[i] = 0.0;
+    force1[i] = 0.0;
+    force2[i] = 0.0;
+  }
+
   double* newx0 = new double[NumberOfBodies]; 
   double* newx1 = new double[NumberOfBodies]; 
   double* newx2 = new double[NumberOfBodies]; 
 
   for (int j=0; j<NumberOfBodies; j++) {
-    force0[j] = 0.0;
-    force1[j] = 0.0;
-    force2[j] = 0.0;
+    for (int i=j+1; i<NumberOfBodies; i++) {
+      const double distance = sqrt(
+        (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
+        (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
+        (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
+      );
 
-    for (int i=0; i<NumberOfBodies; i++) {
-      if (j != i) {
-        const double distance = sqrt(
-          (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
-          (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
-          (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
-        );
+      // x,y,z forces acting on particle 0
+      const double f0 = (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
+      const double f1 = (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
+      const double f2 = (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
 
-        // x,y,z forces acting on particle 0
-        force0[j] += (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
-        force1[j] += (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
-        force2[j] += (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
+      force0[j] += f0; 
+      force1[j] += f1; 
+      force2[j] += f2; 
+      force0[i] -= f0; 
+      force1[i] -= f1; 
+      force2[i] -= f2; 
 
-        minDx = std::min( minDx,distance );
-      }
+      minDx = std::min( minDx,distance );
     }
 
     v[j][0] += timeStepSize * force0[j] / mass[j];
@@ -221,7 +228,10 @@ void updateBody() {
     newx0[j] = x[j][0] + timeStepSize * v[j][0];
     newx1[j] = x[j][1] + timeStepSize * v[j][1];
     newx2[j] = x[j][2] + timeStepSize * v[j][2];
-    maxV = std::max(maxV, std::sqrt( v[0][0]*v[0][0] + v[0][1]*v[0][1] + v[0][2]*v[0][2] ));
+    maxV = std::max(
+      maxV,
+      std::sqrt( v[0][0]*v[0][0] + v[0][1]*v[0][1] + v[0][2]*v[0][2] )
+    );
   }
 
   for (int i=0; i<NumberOfBodies; i++) {
