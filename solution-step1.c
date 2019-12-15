@@ -207,9 +207,9 @@ void updateBody() {
         );
 
         // x,y,z forces acting on particle 0
-        force0[j] += (x[i][0]-x[j][0]) * mass[i]*mass[0] / distance / distance / distance ;
-        force1[j] += (x[i][1]-x[j][1]) * mass[i]*mass[0] / distance / distance / distance ;
-        force2[j] += (x[i][2]-x[j][2]) * mass[i]*mass[0] / distance / distance / distance ;
+        force0[j] += (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
+        force1[j] += (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
+        force2[j] += (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
 
         minDx = std::min( minDx,distance );
       }
