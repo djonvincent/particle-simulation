@@ -219,7 +219,7 @@ void updateBody() {
           v[k][0] = v[k+1][0];
           v[k][1] = v[k+1][1];
           v[k][2] = v[k+1][2];
-          mass[j] = mass[j+1];
+          mass[k] = mass[k+1];
         }
       }
     }
