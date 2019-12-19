@@ -188,47 +188,15 @@ void updateBody() {
   double* force0 = new double[NumberOfBodies];
   double* force1 = new double[NumberOfBodies];
   double* force2 = new double[NumberOfBodies];
-
   for (int i=0; i<NumberOfBodies; i++) {
     force0[i] = 0.0;
     force1[i] = 0.0;
     force2[i] = 0.0;
-    for (int j=i+1; j<NumberOfBodies; j++) {
-      const double distance = sqrt(
-        (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
-        (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
-        (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
-      );
-      // Detect collision and fuse objects
-      if (distance <= 2e-2) {
-        const double frac = mass[j] / (mass[i]+mass[j]);
-        v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
-        v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
-        v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
-        mass[i] = mass[i] + mass[j];
-        x[i][0] = (x[j][0] + x[i][0]) / 2;
-        x[i][1] = (x[j][1] + x[i][1]) / 2;
-        x[i][2] = (x[j][2] + x[i][2]) / 2;
-        
-        // Remove object j
-        NumberOfBodies--;
-        for (int k=j; k<NumberOfBodies; k++) {
-          x[k][0] = x[k+1][0];
-          x[k][1] = x[k+1][1];
-          x[k][2] = x[k+1][2];
-          v[k][0] = v[k+1][0];
-          v[k][1] = v[k+1][1];
-          v[k][2] = v[k+1][2];
-          mass[k] = mass[k+1];
-        }
-      }
-    }
   }
 
   double* newx0 = new double[NumberOfBodies]; 
   double* newx1 = new double[NumberOfBodies]; 
   double* newx2 = new double[NumberOfBodies]; 
-
 
   for (int j=0; j<NumberOfBodies; j++) {
     for (int i=j+1; i<NumberOfBodies; i++) {
@@ -256,16 +224,64 @@ void updateBody() {
     v[j][0] += timeStepSize * force0[j] / mass[j];
     v[j][1] += timeStepSize * force1[j] / mass[j];
     v[j][2] += timeStepSize * force2[j] / mass[j];
+
+    maxV = std::max(
+      maxV,
+      std::sqrt( pow(v[j][0], 2) + pow(v[j][1], 2) + pow(v[j][2], 2) )
+    );
+
     newx0[j] = x[j][0] + timeStepSize * v[j][0];
     newx1[j] = x[j][1] + timeStepSize * v[j][1];
     newx2[j] = x[j][2] + timeStepSize * v[j][2];
-    maxV = std::max(
-      maxV,
-      std::sqrt( v[0][0]*v[0][0] + v[0][1]*v[0][1] + v[0][2]*v[0][2] )
-    );
   }
 
   for (int i=0; i<NumberOfBodies; i++) {
+    for (int j=i+1; j<NumberOfBodies; j++) {
+      const double a = pow(v[i][0]-v[j][0], 2) + 
+        pow(v[i][1]-v[j][1], 2) +
+        pow(v[i][2]-v[j][2], 2);
+      const double b = 2*(
+        (x[i][0]-x[j][0])*(v[i][0]-v[j][0]) +
+        (x[i][1]-x[j][1])*(v[i][1]-v[j][1]) +
+        (x[i][2]-x[j][2])*(v[i][2]-v[j][2])
+      );
+      const double c = pow(x[i][0]-x[j][0], 2) +
+        pow(x[i][1]-x[j][1], 2) +
+        pow(x[i][2]-x[j][2], 2) -
+        pow(2*1e-2, 2);
+      const double det = pow(b, 2) - 4*a*c;
+      if (det >= 0) {
+        double tCollide = (-b-sqrt(det))/(2*a);
+        if (tCollide < 0) {
+          tCollide = (-b+sqrt(det))/(2*a);
+        }
+        if (tCollide >= 0 && tCollide <= timeStepSize) {
+          const double frac = mass[j] / (mass[i]+mass[j]);
+          v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
+          v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
+          v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
+          mass[i] = mass[i] + mass[j];
+          newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
+          newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
+          newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+          
+          // Remove object j
+          NumberOfBodies--;
+          for (int k=j; k<NumberOfBodies; k++) {
+            x[k][0] = x[k+1][0];
+            x[k][1] = x[k+1][1];
+            x[k][2] = x[k+1][2];
+            newx0[k] = newx0[k+1];
+            newx1[k] = newx1[k+1];
+            newx2[k] = newx2[k+1];
+            v[k][0] = v[k+1][0];
+            v[k][1] = v[k+1][1];
+            v[k][2] = v[k+1][2];
+            mass[k] = mass[k+1];
+          }
+        }
+      }
+    }
     x[i][0] = newx0[i];
     x[i][1] = newx1[i];
     x[i][2] = newx2[i];
