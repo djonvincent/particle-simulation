@@ -180,6 +180,7 @@ void printParaviewSnapshot() {
  */
 void updateBody() {
   const int numBuckets = 2;
+  const int timeSteps = pow(2, numBuckets-1);
   const double vBucket = maxV/numBuckets;
   int* buckets = new int[NumberOfBodies];
   //printf("timeSteps: %d\n", timeSteps);
@@ -220,110 +221,105 @@ void updateBody() {
     newx2[i] = x[i][2];
   }
 
-  for (int b=0; b<numBuckets; b++) {
-    const int timeSteps = pow(2, b);
+  for (int ts=0; ts<timeSteps; ts++) {
     const double deltaT = timeStepSize/timeSteps;
-    for (int ts=0; ts<timeSteps; ts++) {
-      //printf("deltaT: %f\n", deltaT);
-      for (int j=0; j<NumberOfBodies; j++) {
-        if (buckets[j] == b) {
-          //printf("j: %d\n", j);
-          //printf("%d %d\n", timeSteps, buckets[j]);
-          for (int i=0; i<NumberOfBodies; i++) {
-            if (i == j) {
-              continue;
-            }
-            const double distance = sqrt(
-              pow(x[j][0]-x[i][0], 2) +
-              pow(x[j][1]-x[i][1], 2) +
-              pow(x[j][2]-x[i][2], 2)
-            );
-
-            // x,y,z forces acting on particle 0
-            //printf("d: %f\n", distance);
-            const double f0 = (x[i][0]-x[j][0]) * mass[i]*mass[j] / pow(distance, 3);
-            const double f1 = (x[i][1]-x[j][1]) * mass[i]*mass[j] / pow(distance, 3);
-            const double f2 = (x[i][2]-x[j][2]) * mass[i]*mass[j] / pow(distance, 3);
-            //printf("f: %f %f %f\n", f0, f1, f2);
-
-            force0[j] += f0; 
-            force1[j] += f1; 
-            force2[j] += f2; 
-
-            minDx = std::min( minDx,distance );
+    //printf("deltaT: %f\n", deltaT);
+    for (int j=0; j<NumberOfBodies; j++) {
+      //printf("j: %d\n", j);
+      //printf("%d %d\n", timeSteps, buckets[j]);
+      if (ts % (int)pow(2, timeSteps-(buckets[j]+1)) == 0) {
+        for (int i=0; i<NumberOfBodies; i++) {
+          if (i == j) {
+            continue;
           }
-
-          //printf("v: %f %f %f\n", v[j][0], v[j][1], v[j][2]);
-          v[j][0] += deltaT * force0[j] / mass[j];
-          v[j][1] += deltaT * force1[j] / mass[j];
-          v[j][2] += deltaT * force2[j] / mass[j];
-
-          newx0[j] += deltaT * v[j][0];
-          newx1[j] += deltaT * v[j][1];
-          newx2[j] += deltaT * v[j][2];
-          maxV = std::max(
-            maxV,
-            std::sqrt( pow(v[j][0], 2) + pow(v[j][1], 2) + pow(v[j][2], 2) )
+          const double distance = sqrt(
+            pow(x[j][0]-x[i][0], 2) +
+            pow(x[j][1]-x[i][1], 2) +
+            pow(x[j][2]-x[i][2], 2)
           );
+
+          // x,y,z forces acting on particle 0
+          //printf("d: %f\n", distance);
+          const double f0 = (x[i][0]-x[j][0]) * mass[i]*mass[j] / pow(distance, 3);
+          const double f1 = (x[i][1]-x[j][1]) * mass[i]*mass[j] / pow(distance, 3);
+          const double f2 = (x[i][2]-x[j][2]) * mass[i]*mass[j] / pow(distance, 3);
+          //printf("f: %f %f %f\n", f0, f1, f2);
+
+          force0[j] += f0; 
+          force1[j] += f1; 
+          force2[j] += f2; 
+
+          minDx = std::min( minDx,distance );
         }
+
+        //printf("v: %f %f %f\n", v[j][0], v[j][1], v[j][2]);
+        v[j][0] += deltaT * force0[j] / mass[j];
+        v[j][1] += deltaT * force1[j] / mass[j];
+        v[j][2] += deltaT * force2[j] / mass[j];
+
+        newx0[j] = x[j][0] + deltaT * v[j][0];
+        newx1[j] = x[j][1] + deltaT * v[j][1];
+        newx2[j] = x[j][2] + deltaT * v[j][2];
+        maxV = std::max(
+          maxV,
+          std::sqrt( pow(v[j][0], 2) + pow(v[j][1], 2) + pow(v[j][2], 2) )
+        );
       }
       //printf("v: %f %f %f\n", v[j][0], v[j][1], v[j][2]);
-      for (int i=0; i<NumberOfBodies; i++) {
-        for (int j=i+1; j<NumberOfBodies; j++) {
-          const double a = pow(v[i][0]-v[j][0], 2) + 
-            pow(v[i][1]-v[j][1], 2) +
-            pow(v[i][2]-v[j][2], 2);
-          const double b = 2*(
-            (x[i][0]-x[j][0])*(v[i][0]-v[j][0]) +
-            (x[i][1]-x[j][1])*(v[i][1]-v[j][1]) +
-            (x[i][2]-x[j][2])*(v[i][2]-v[j][2])
-          );
-          const double c = pow(x[i][0]-x[j][0], 2) +
-            pow(x[i][1]-x[j][1], 2) +
-            pow(x[i][2]-x[j][2], 2) -
-            pow(2*1e-2, 2);
-          const double det = pow(b, 2) - 4*a*c;
-          if (det >= 0) {
-            double tCollide = (-b-sqrt(det))/(2*a);
-            if (tCollide < 0) {
-              tCollide = (-b+sqrt(det))/(2*a);
-            }
-            if (tCollide >= 0 && tCollide <= timeStepSize) {
-              const double frac = mass[j] / (mass[i]+mass[j]);
-              v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
-              v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
-              v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
-              mass[i] = mass[i] + mass[j];
-              newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
-              newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
-              newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
-              
-              // Remove object j
-              NumberOfBodies--;
-              for (int k=j; k<NumberOfBodies; k++) {
-                x[k][0] = x[k+1][0];
-                x[k][1] = x[k+1][1];
-                x[k][2] = x[k+1][2];
-                newx0[k] = newx0[k+1];
-                newx1[k] = newx1[k+1];
-                newx2[k] = newx2[k+1];
-                v[k][0] = v[k+1][0];
-                v[k][1] = v[k+1][1];
-                v[k][2] = v[k+1][2];
-                mass[k] = mass[k+1];
-                buckets[k] = buckets[k+1];
-              }
+    }
+
+    for (int i=0; i<NumberOfBodies; i++) {
+      for (int j=i+1; j<NumberOfBodies; j++) {
+        const double a = pow(v[i][0]-v[j][0], 2) + 
+          pow(v[i][1]-v[j][1], 2) +
+          pow(v[i][2]-v[j][2], 2);
+        const double b = 2*(
+          (x[i][0]-x[j][0])*(v[i][0]-v[j][0]) +
+          (x[i][1]-x[j][1])*(v[i][1]-v[j][1]) +
+          (x[i][2]-x[j][2])*(v[i][2]-v[j][2])
+        );
+        const double c = pow(x[i][0]-x[j][0], 2) +
+          pow(x[i][1]-x[j][1], 2) +
+          pow(x[i][2]-x[j][2], 2) -
+          pow(2*1e-2, 2);
+        const double det = pow(b, 2) - 4*a*c;
+        if (det >= 0) {
+          double tCollide = (-b-sqrt(det))/(2*a);
+          if (tCollide < 0) {
+            tCollide = (-b+sqrt(det))/(2*a);
+          }
+          if (tCollide >= 0 && tCollide <= timeStepSize) {
+            const double frac = mass[j] / (mass[i]+mass[j]);
+            v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
+            v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
+            v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
+            mass[i] = mass[i] + mass[j];
+            newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
+            newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
+            newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+            
+            // Remove object j
+            NumberOfBodies--;
+            for (int k=j; k<NumberOfBodies; k++) {
+              x[k][0] = x[k+1][0];
+              x[k][1] = x[k+1][1];
+              x[k][2] = x[k+1][2];
+              newx0[k] = newx0[k+1];
+              newx1[k] = newx1[k+1];
+              newx2[k] = newx2[k+1];
+              v[k][0] = v[k+1][0];
+              v[k][1] = v[k+1][1];
+              v[k][2] = v[k+1][2];
+              mass[k] = mass[k+1];
+              buckets[k] = buckets[k+1];
             }
           }
         }
       }
+      x[i][0] = newx0[i];
+      x[i][1] = newx1[i];
+      x[i][2] = newx2[i];
     }
-  }
-
-  for (int i=0; i<NumberOfBodies; i++) {
-    x[i][0] = newx0[i];
-    x[i][1] = newx1[i];
-    x[i][2] = newx2[i];
   }
 
   // These are three buggy lines of code that we will use in one of the labs
