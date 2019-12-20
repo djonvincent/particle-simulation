@@ -179,7 +179,7 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  const int numBuckets = 2;
+  const int numBuckets = 10;
   const double vBucket = maxV/numBuckets;
   int* buckets = new int[NumberOfBodies];
   //printf("timeSteps: %d\n", timeSteps);
@@ -188,7 +188,7 @@ void updateBody() {
   for (int i=0; i<NumberOfBodies; i++) {
     if (vBucket > 0) {
       const double vSize = sqrt(pow(v[i][0], 2) + pow(v[i][1], 2) + pow(v[i][2], 2));
-      //printf("v: %f\n", vSize);
+      printf("v: %f\n", vSize);
       buckets[i] = (int)(vSize/vBucket);
       if (vSize >= maxV) {
         buckets[i] -= 1;
@@ -220,13 +220,14 @@ void updateBody() {
     newx2[i] = x[i][2];
   }
 
-  for (int b=0; b<numBuckets; b++) {
-    const int timeSteps = pow(2, b);
+  for (int bucket=0; bucket<numBuckets; bucket++) {
+    const int timeSteps = pow(2, bucket);
     const double deltaT = timeStepSize/timeSteps;
+    printf("deltaT: %f\n", deltaT);
     for (int ts=0; ts<timeSteps; ts++) {
       //printf("deltaT: %f\n", deltaT);
       for (int j=0; j<NumberOfBodies; j++) {
-        if (buckets[j] == b) {
+        if (buckets[j] == bucket) {
           //printf("j: %d\n", j);
           //printf("%d %d\n", timeSteps, buckets[j]);
           for (int i=0; i<NumberOfBodies; i++) {
@@ -244,7 +245,7 @@ void updateBody() {
             const double f0 = (x[i][0]-x[j][0]) * mass[i]*mass[j] / pow(distance, 3);
             const double f1 = (x[i][1]-x[j][1]) * mass[i]*mass[j] / pow(distance, 3);
             const double f2 = (x[i][2]-x[j][2]) * mass[i]*mass[j] / pow(distance, 3);
-            //printf("f: %f %f %f\n", f0, f1, f2);
+            printf("f: %f %f %f\n", f0, f1, f2);
 
             force0[j] += f0; 
             force1[j] += f1; 
@@ -288,7 +289,7 @@ void updateBody() {
             if (tCollide < 0) {
               tCollide = (-b+sqrt(det))/(2*a);
             }
-            if (tCollide >= 0 && tCollide <= timeStepSize) {
+            if (tCollide >= 0 && tCollide <= deltaT) {
               const double frac = mass[j] / (mass[i]+mass[j]);
               v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
               v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];

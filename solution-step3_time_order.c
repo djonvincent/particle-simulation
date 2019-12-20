@@ -179,7 +179,7 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  const int numBuckets = 2;
+  const int numBuckets = 10;
   const int timeSteps = pow(2, numBuckets-1);
   const double vBucket = maxV/numBuckets;
   int* buckets = new int[NumberOfBodies];
@@ -288,7 +288,7 @@ void updateBody() {
           if (tCollide < 0) {
             tCollide = (-b+sqrt(det))/(2*a);
           }
-          if (tCollide >= 0 && tCollide <= timeStepSize) {
+          if (tCollide >= 0 && tCollide <= deltaT) {
             const double frac = mass[j] / (mass[i]+mass[j]);
             v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
             v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
