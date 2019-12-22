@@ -236,33 +236,17 @@ void updateBody() {
   maxV   = std::numeric_limits<double>::min();
   minDx  = std::numeric_limits<double>::max();
 
-  // force0 = force along x direction
-  // force1 = force along y direction
-  // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
-
-  for (int i=0; i<NumberOfBodies; i++) {
-    force0[i] = 0.0;
-    force1[i] = 0.0;
-    force2[i] = 0.0;
-  }
-
-
   //printf("new timestep\n");
-  #pragma omp parallel
-  {
-    double* myforce0 = new double[NumberOfBodies];
-    double* myforce1 = new double[NumberOfBodies];
-    double* myforce2 = new double[NumberOfBodies];
-    double total = 0;
-    //printf("%d\n", omp_get_thread_num());
-    #pragma omp for
-    for (int j=0; j<NumberOfBodies; j++) {
-      double f0 = 0;
-      double f1 = 0;
-      double f2 = 0;
+  for (int j=0; j<NumberOfBodies; j++) {
+    double f0 = 0;
+    double f1 = 0;
+    double f2 = 0;
+    #pragma omp parallel
+    {
+      double myf0 = 0;
+      double myf1 = 0;
+      double myf2 = 0;
+      #pragma omp for
       for (int i=0; i<NumberOfBodies; i++) {
         //printf("j: %d i: %d thread: %d\n", j, i, omp_get_thread_num());
         if (i==j) {
@@ -275,27 +259,30 @@ void updateBody() {
         );
 
         // x,y,z forces acting on particle 0
-        f0 += (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
-        f1 += (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
-        f2 += (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
+        myf0 += (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
+        myf1 += (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
+        myf2 += (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
 
-        minDx = std::min( minDx,distance );
+        //minDx = std::min( minDx,distance );
       }
-      total += f0;
-      myforce0[j] = f0;
-      //myforce1[j] = f1;
-      //myforce2[j] = f2;
+      #pragma omp critical
+      {
+        f0 += myf0;
+        f1 += myf1;
+        f2 += myf2;
+      }
     }
+
+    v[j][0] += timeStepSize * f0 / mass[j];
+    v[j][1] += timeStepSize * f1 / mass[j];
+    v[j][2] += timeStepSize * f2 / mass[j];
+    maxV = std::max(
+      maxV,
+      std::sqrt( pow(v[j][0], 2) + pow(v[j][1], 2) + pow(v[j][2], 2) )
+    );
   }
 
   for (int i=0; i<NumberOfBodies; i++) {
-    v[i][0] += timeStepSize * force0[i] / mass[i];
-    v[i][1] += timeStepSize * force1[i] / mass[i];
-    v[i][2] += timeStepSize * force2[i] / mass[i];
-    maxV = std::max(
-      maxV,
-      std::sqrt( pow(v[i][0], 2) + pow(v[i][1], 2) + pow(v[i][2], 2) )
-    );
     x[i][0] += timeStepSize * v[i][0];
     x[i][1] += timeStepSize * v[i][1];
     x[i][2] += timeStepSize * v[i][2];
@@ -308,9 +295,6 @@ void updateBody() {
 
   t += timeStepSize;
 
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
 }
 
 
@@ -360,14 +344,14 @@ int main(int argc, char** argv) {
     updateBody();
     timeStepCounter++;
     if (t >= tPlot) {
-      //printParaviewSnapshot();
-      /*std::cout << "plot next snapshot"
+      printParaviewSnapshot();
+      std::cout << "plot next snapshot"
     		    << ",\t time step=" << timeStepCounter
     		    << ",\t t="         << t
 				<< ",\t dt="        << timeStepSize
 				<< ",\t v_max="     << maxV
 				<< ",\t dx_min="    << minDx
-				<< std::endl;*/
+				<< std::endl;
 
       tPlot += tPlotDelta;
     }
