@@ -233,26 +233,26 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  maxV = 0;
-  minDx = std::numeric_limits<double>::max();
+  maxV   = 0.0;
+  double maxVSquared = 0.0;
+  minDx  = std::numeric_limits<double>::max();
 
-  //printf("new timestep\n");
-  for (int j=0; j<NumberOfBodies; j++) {
-    double f0 = 0;
-    double f1 = 0;
-    double f2 = 0;
-    #pragma omp parallel
-    {
-      double myf0 = 0;
-      double myf1 = 0;
-      double myf2 = 0;
-      double myMinDx = minDx;
-      #pragma omp for
-      for (int i=0; i<NumberOfBodies; i++) {
-        //printf("j: %d i: %d thread: %d\n", j, i, omp_get_thread_num());
-        if (i==j) {
-          continue;
-        }
+  unsigned long int numForces = NumberOfBodies*(NumberOfBodies-1)/2; 
+  std::cout << numForces <<"\n";
+  double forces0[numForces] = {0.0};
+  double forces1[numForces] = {0.0};
+  double forces2[numForces] = {0.0};
+
+  #pragma omp parallel
+  {
+    double myMinDx = minDx;
+    //double** myV = new double*[NumberOfBodies];
+    #pragma omp for
+    for (int j=0; j<NumberOfBodies; j++) {
+      unsigned long int forcesIndex = numForces - (NumberOfBodies-j)*(NumberOfBodies-j-1)/2;
+      std::cout << (NumberOfBodies-j)*(NumberOfBodies-j-1)/2 << "\n";
+      std::cout << forcesIndex << "\n";
+      for (int i=j+1; i<NumberOfBodies; i++) {
         const double distance = sqrt(
           (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
           (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
@@ -261,29 +261,50 @@ void updateBody() {
 
         // x,y,z forces acting on particle 0
         double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
-        myf0 += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
-        myf1 += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
-        myf2 += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
+        forces0[forcesIndex] = (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
+        forces1[forcesIndex] = (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
+        forces2[forcesIndex] = (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
 
         myMinDx = std::min( myMinDx,distance );
-      }
-      #pragma omp critical
-      {
-        f0 += myf0;
-        f1 += myf1;
-        f2 += myf2;
-        minDx = std::min(minDx, myMinDx);
+        forcesIndex ++;
       }
     }
+    #pragma omp critical
+    {
+      minDx = std::min(minDx, myMinDx);
+    }
+  }
 
-    v[j][0] += timeStepSize * f0 / mass[j];
-    v[j][1] += timeStepSize * f1 / mass[j];
-    v[j][2] += timeStepSize * f2 / mass[j];
-    maxV = std::max(
-      maxV,
-      std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
+  std::cout << "done\n";
+
+  unsigned long int forcesIndex = 0;
+  double f0[NumberOfBodies] = {0.0};
+  double f1[NumberOfBodies] = {0.0};
+  double f2[NumberOfBodies] = {0.0};
+
+  for (int j=0; j<NumberOfBodies; j++) {
+    for (int i=j+1; i<NumberOfBodies; i++) {
+      f0[j] += forces0[forcesIndex];
+      f1[j] += forces1[forcesIndex];
+      f2[j] += forces2[forcesIndex];
+      f0[i] -= forces0[forcesIndex];
+      f1[i] -= forces1[forcesIndex];
+      f2[i] -= forces2[forcesIndex];
+      forcesIndex ++;
+    }
+  }
+
+  for (int i=0; i<NumberOfBodies; i++) {
+    v[i][0] += timeStepSize * f0[i] / mass[i];
+    v[i][1] += timeStepSize * f1[i] / mass[i];
+    v[i][2] += timeStepSize * f2[i] / mass[i];
+    maxVSquared = std::max(
+        maxVSquared,
+        v[i][0]*v[i][0] + v[i][1]*v[i][1] + v[i][2]*v[i][2]
     );
   }
+
+  maxV = std::sqrt(maxVSquared);
 
   for (int i=0; i<NumberOfBodies; i++) {
     x[i][0] += timeStepSize * v[i][0];
@@ -297,7 +318,6 @@ void updateBody() {
 //  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
 
   t += timeStepSize;
-
 }
 
 
@@ -347,7 +367,7 @@ int main(int argc, char** argv) {
     updateBody();
     timeStepCounter++;
     if (t >= tPlot) {
-      printParaviewSnapshot();
+      //printParaviewSnapshot();
       std::cout << "plot next snapshot"
     		    << ",\t time step=" << timeStepCounter
     		    << ",\t t="         << t

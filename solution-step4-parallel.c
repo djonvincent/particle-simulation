@@ -233,40 +233,23 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  maxV   = std::numeric_limits<double>::min();
+  maxV   = 0.0;
+  double maxVSquared = 0.0;
   minDx  = std::numeric_limits<double>::max();
 
-  // force0 = force along x direction
-  // force1 = force along y direction
-  // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
-
-  for (int i=0; i<NumberOfBodies; i++) {
-    force0[i] = 0.0;
-    force1[i] = 0.0;
-    force2[i] = 0.0;
-  }
-
-
-  //printf("new timestep\n");
   #pragma omp parallel
   {
-    double* myforce0 = new double[NumberOfBodies];
-    double* myforce1 = new double[NumberOfBodies];
-    double* myforce2 = new double[NumberOfBodies];
-    double total = 0;
-    //printf("%d\n", omp_get_thread_num());
+    double myMinDx = minDx;
+    double myMaxVSquared = 0.0;
+    //double** myV = new double*[NumberOfBodies];
     #pragma omp for
     for (int j=0; j<NumberOfBodies; j++) {
       double f0 = 0;
       double f1 = 0;
       double f2 = 0;
       for (int i=0; i<NumberOfBodies; i++) {
-        //printf("j: %d i: %d thread: %d\n", j, i, omp_get_thread_num());
-        if (i==j) {
-          continue;
+        if (j == i) {
+            continue;
         }
         const double distance = sqrt(
           (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
@@ -280,23 +263,27 @@ void updateBody() {
         f1 += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
         f2 += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
 
-        minDx = std::min( minDx,distance );
+        myMinDx = std::min( myMinDx,distance );
       }
-      total += f0;
-      myforce0[j] = f0;
-      //myforce1[j] = f1;
-      //myforce2[j] = f2;
+      v[j][0] += timeStepSize * f0 / mass[j];
+      v[j][1] += timeStepSize * f1 / mass[j];
+      v[j][2] += timeStepSize * f2 / mass[j];
+
+      myMaxVSquared = std::max(
+          myMaxVSquared,
+          v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2]
+        );
+    }
+    #pragma omp critical
+    {
+      minDx = std::min(minDx, myMinDx);
+      maxVSquared = std::max(maxVSquared, myMaxVSquared);
     }
   }
 
+  maxV = std::sqrt(maxVSquared);
+
   for (int i=0; i<NumberOfBodies; i++) {
-    v[i][0] += timeStepSize * force0[i] / mass[i];
-    v[i][1] += timeStepSize * force1[i] / mass[i];
-    v[i][2] += timeStepSize * force2[i] / mass[i];
-    maxV = std::max(
-      maxV,
-      std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
-    );
     x[i][0] += timeStepSize * v[i][0];
     x[i][1] += timeStepSize * v[i][1];
     x[i][2] += timeStepSize * v[i][2];
@@ -308,10 +295,6 @@ void updateBody() {
 //  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
 
   t += timeStepSize;
-
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
 }
 
 
@@ -362,13 +345,13 @@ int main(int argc, char** argv) {
     timeStepCounter++;
     if (t >= tPlot) {
       //printParaviewSnapshot();
-      /*std::cout << "plot next snapshot"
+      std::cout << "plot next snapshot"
     		    << ",\t time step=" << timeStepCounter
     		    << ",\t t="         << t
 				<< ",\t dt="        << timeStepSize
 				<< ",\t v_max="     << maxV
 				<< ",\t dx_min="    << minDx
-				<< std::endl;*/
+				<< std::endl;
 
       tPlot += tPlotDelta;
     }
