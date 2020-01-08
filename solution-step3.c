@@ -246,7 +246,6 @@ void updateBody() {
             force0[j] += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
             force1[j] += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
             force2[j] += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
-            printf("f: %f %f %f\n", f0, f1, f2);
 
             minDx = std::min( minDx,distance );
           }

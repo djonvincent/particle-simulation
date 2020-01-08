@@ -207,9 +207,10 @@ void updateBody() {
       );
 
       // x,y,z forces acting on particle 0
-      const double f0 = (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
-      const double f1 = (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
-      const double f2 = (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
+      double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
+      const double f0 = (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
+      const double f1 = (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
+      const double f2 = (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
 
       force0[j] += f0; 
       force1[j] += f1; 
@@ -237,20 +238,20 @@ void updateBody() {
 
   for (int i=0; i<NumberOfBodies; i++) {
     for (int j=i+1; j<NumberOfBodies; j++) {
+      const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
+        (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
+        (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
+      const double b = 2*(
+        (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
+        (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
+        (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
+      );
+      const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
+        (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
+        (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
+        (2*1e-2, 2);
+      const double det = b*b - 4*a*c;
       if (det >= 0) {
-        const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
-          (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
-          (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
-        const double b = 2*(
-          (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
-          (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
-          (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
-        );
-        const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
-          (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
-          (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-          (2*1e-2, 2);
-        const double det = b*b - 4*a*c;
         double tCollide = (-b-sqrt(det))/(2*a);
         if (tCollide < 0) {
           tCollide = (-b+sqrt(det))/(2*a);

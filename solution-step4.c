@@ -275,9 +275,10 @@ void updateBody() {
         );
 
         // x,y,z forces acting on particle 0
-        f0 += (x[i][0]-x[j][0]) * mass[i]*mass[j] / distance / distance / distance ;
-        f1 += (x[i][1]-x[j][1]) * mass[i]*mass[j] / distance / distance / distance ;
-        f2 += (x[i][2]-x[j][2]) * mass[i]*mass[j] / distance / distance / distance ;
+        double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
+        f0 += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
+        f1 += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
+        f2 += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
 
         minDx = std::min( minDx,distance );
       }
