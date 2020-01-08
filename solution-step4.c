@@ -294,7 +294,7 @@ void updateBody() {
     v[i][2] += timeStepSize * force2[i] / mass[i];
     maxV = std::max(
       maxV,
-      std::sqrt( pow(v[i][0], 2) + pow(v[i][1], 2) + pow(v[i][2], 2) )
+      std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
     );
     x[i][0] += timeStepSize * v[i][0];
     x[i][1] += timeStepSize * v[i][1];

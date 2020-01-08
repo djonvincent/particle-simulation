@@ -187,7 +187,7 @@ void updateBody() {
   //printf("maxV: %f\n", maxV);
   for (int i=0; i<NumberOfBodies; i++) {
     if (vBucket > 0) {
-      const double vSize = sqrt(pow(v[i][0], 2) + pow(v[i][1], 2) + pow(v[i][2], 2));
+      const double vSize = sqrt(v[i][0]*v[i][0] + v[i][1]*v[i][1] + v[i][2]*v[i][2]);
       printf("v: %f\n", vSize);
       buckets[i] = (int)(vSize/vBucket);
       if (vSize >= maxV) {
@@ -235,21 +235,18 @@ void updateBody() {
               continue;
             }
             const double distance = sqrt(
-              pow(x[j][0]-x[i][0], 2) +
-              pow(x[j][1]-x[i][1], 2) +
-              pow(x[j][2]-x[i][2], 2)
+              (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
+              (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
+              (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
             );
 
             // x,y,z forces acting on particle 0
             //printf("d: %f\n", distance);
-            const double f0 = (x[i][0]-x[j][0]) * mass[i]*mass[j] / pow(distance, 3);
-            const double f1 = (x[i][1]-x[j][1]) * mass[i]*mass[j] / pow(distance, 3);
-            const double f2 = (x[i][2]-x[j][2]) * mass[i]*mass[j] / pow(distance, 3);
+            double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
+            force0[j] += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
+            force1[j] += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
+            force2[j] += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
             printf("f: %f %f %f\n", f0, f1, f2);
-
-            force0[j] += f0; 
-            force1[j] += f1; 
-            force2[j] += f2; 
 
             minDx = std::min( minDx,distance );
           }
@@ -264,26 +261,26 @@ void updateBody() {
           newx2[j] += deltaT * v[j][2];
           maxV = std::max(
             maxV,
-            std::sqrt( pow(v[j][0], 2) + pow(v[j][1], 2) + pow(v[j][2], 2) )
+            std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
           );
         }
       }
       //printf("v: %f %f %f\n", v[j][0], v[j][1], v[j][2]);
       for (int i=0; i<NumberOfBodies; i++) {
         for (int j=i+1; j<NumberOfBodies; j++) {
-          const double a = pow(v[i][0]-v[j][0], 2) + 
-            pow(v[i][1]-v[j][1], 2) +
-            pow(v[i][2]-v[j][2], 2);
+          const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
+            (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
+            (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
           const double b = 2*(
-            (x[i][0]-x[j][0])*(v[i][0]-v[j][0]) +
-            (x[i][1]-x[j][1])*(v[i][1]-v[j][1]) +
-            (x[i][2]-x[j][2])*(v[i][2]-v[j][2])
+            (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
+            (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
+            (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
           );
-          const double c = pow(x[i][0]-x[j][0], 2) +
-            pow(x[i][1]-x[j][1], 2) +
-            pow(x[i][2]-x[j][2], 2) -
-            pow(2*1e-2, 2);
-          const double det = pow(b, 2) - 4*a*c;
+          const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
+            (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
+            (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
+            (2*1e-2, 2);
+          const double det = b*b - 4*a*c;
           if (det >= 0) {
             double tCollide = (-b-sqrt(det))/(2*a);
             if (tCollide < 0) {

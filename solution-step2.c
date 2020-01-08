@@ -227,7 +227,7 @@ void updateBody() {
 
     maxV = std::max(
       maxV,
-      std::sqrt( pow(v[j][0], 2) + pow(v[j][1], 2) + pow(v[j][2], 2) )
+      std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
     );
 
     newx0[j] = x[j][0] + timeStepSize * v[j][0];
@@ -237,20 +237,20 @@ void updateBody() {
 
   for (int i=0; i<NumberOfBodies; i++) {
     for (int j=i+1; j<NumberOfBodies; j++) {
-      const double a = pow(v[i][0]-v[j][0], 2) + 
-        pow(v[i][1]-v[j][1], 2) +
-        pow(v[i][2]-v[j][2], 2);
-      const double b = 2*(
-        (x[i][0]-x[j][0])*(v[i][0]-v[j][0]) +
-        (x[i][1]-x[j][1])*(v[i][1]-v[j][1]) +
-        (x[i][2]-x[j][2])*(v[i][2]-v[j][2])
-      );
-      const double c = pow(x[i][0]-x[j][0], 2) +
-        pow(x[i][1]-x[j][1], 2) +
-        pow(x[i][2]-x[j][2], 2) -
-        pow(2*1e-2, 2);
-      const double det = pow(b, 2) - 4*a*c;
       if (det >= 0) {
+        const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
+          (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
+          (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
+        const double b = 2*(
+          (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
+          (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
+          (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
+        );
+        const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
+          (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
+          (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
+          (2*1e-2, 2);
+        const double det = b*b - 4*a*c;
         double tCollide = (-b-sqrt(det))/(2*a);
         if (tCollide < 0) {
           tCollide = (-b+sqrt(det))/(2*a);
