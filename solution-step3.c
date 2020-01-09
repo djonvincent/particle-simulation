@@ -179,7 +179,7 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  const int numBuckets = 2;
+  const int numBuckets = 10;
   const double vBucket = maxV/numBuckets;
   int buckets[NumberOfBodies];
 
@@ -195,18 +195,12 @@ void updateBody() {
     }
   }
 
-  maxV   = std::numeric_limits<double>::min();
+  maxV   = 0.0;;
   minDx  = std::numeric_limits<double>::max();
 
-  double* newx0 = new double[NumberOfBodies]; 
-  double* newx1 = new double[NumberOfBodies]; 
-  double* newx2 = new double[NumberOfBodies]; 
-
-  for (int i=0; i<NumberOfBodies; i++) {
-    newx0[i] = x[i][0];
-    newx1[i] = x[i][1];
-    newx2[i] = x[i][2];
-  }
+  double newx0[NumberOfBodies];
+  double newx1[NumberOfBodies];
+  double newx2[NumberOfBodies];
 
   for (int bucket=0; bucket<numBuckets; bucket++) {
     const int timeSteps = pow(2, bucket);
@@ -227,7 +221,6 @@ void updateBody() {
               (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
             );
 
-            // x,y,z forces acting on particle 0
             double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
             force0[j] += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
             force1[j] += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
@@ -240,9 +233,9 @@ void updateBody() {
           v[j][1] += deltaT * force1[j] / mass[j];
           v[j][2] += deltaT * force2[j] / mass[j];
 
-          newx0[j] += deltaT * v[j][0];
-          newx1[j] += deltaT * v[j][1];
-          newx2[j] += deltaT * v[j][2];
+          newx0[j] = x[j][0] + deltaT * v[j][0];
+          newx1[j] = x[j][1] + deltaT * v[j][1];
+          newx2[j] = x[j][2] + deltaT * v[j][2];
           maxV = std::max(
             maxV,
             std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
@@ -301,25 +294,19 @@ void updateBody() {
               }
             }
           }
+          // Update the positions of all particles in the current bucket
+          x[i][0] = newx0[i];
+          x[i][1] = newx1[i];
+          x[i][2] = newx2[i];
         }
-        // Update the positions of all particles in the current bucket
-        x[i][0] = newx0[i];
-        x[i][1] = newx1[i];
-        x[i][2] = newx2[i];
       }
     }
   }
-
 
   if (NumberOfBodies == 1) {
     t = tFinal;
   }
   t += timeStepSize;
-
-  delete[] newx0; 
-  delete[] newx1; 
-  delete[] newx2; 
-
 }
 
 
