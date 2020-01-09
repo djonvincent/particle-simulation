@@ -185,18 +185,13 @@ void updateBody() {
   // force0 = force along x direction
   // force1 = force along y direction
   // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
-  for (int i=0; i<NumberOfBodies; i++) {
-    force0[i] = 0.0;
-    force1[i] = 0.0;
-    force2[i] = 0.0;
-  }
+  double force0[NumberOfBodies] = {0.0};
+  double force1[NumberOfBodies] = {0.0};
+  double force2[NumberOfBodies] = {0.0};
 
-  double* newx0 = new double[NumberOfBodies]; 
-  double* newx1 = new double[NumberOfBodies]; 
-  double* newx2 = new double[NumberOfBodies]; 
+  double newx0[NumberOfBodies];
+  double newx1[NumberOfBodies];
+  double newx2[NumberOfBodies];
 
   for (int j=0; j<NumberOfBodies; j++) {
     for (int i=j+1; i<NumberOfBodies; i++) {
@@ -249,7 +244,7 @@ void updateBody() {
       const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
         (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
         (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-        (2*1e-2, 2);
+        (2*1e-2)*(2*1e-2);
       const double det = b*b - 4*a*c;
       if (det >= 0) {
         double tCollide = (-b-sqrt(det))/(2*a);
@@ -257,6 +252,7 @@ void updateBody() {
           tCollide = (-b+sqrt(det))/(2*a);
         }
         if (tCollide >= 0 && tCollide <= timeStepSize) {
+          std::cout << "tCollide: " << tCollide << "\n";
           const double frac = mass[j] / (mass[i]+mass[j]);
           v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
           v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
@@ -297,14 +293,6 @@ void updateBody() {
     t = tFinal;
   }
   t += timeStepSize;
-
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
-  delete[] newx0; 
-  delete[] newx1; 
-  delete[] newx2; 
-
 }
 
 

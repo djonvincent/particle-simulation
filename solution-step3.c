@@ -179,16 +179,13 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  const int numBuckets = 10;
+  const int numBuckets = 2;
   const double vBucket = maxV/numBuckets;
-  int* buckets = new int[NumberOfBodies];
-  //printf("timeSteps: %d\n", timeSteps);
-  //printf("vBucket: %f\n", vBucket);
-  //printf("maxV: %f\n", maxV);
+  int buckets[NumberOfBodies];
+
   for (int i=0; i<NumberOfBodies; i++) {
     if (vBucket > 0) {
       const double vSize = sqrt(v[i][0]*v[i][0] + v[i][1]*v[i][1] + v[i][2]*v[i][2]);
-      printf("v: %f\n", vSize);
       buckets[i] = (int)(vSize/vBucket);
       if (vSize >= maxV) {
         buckets[i] -= 1;
@@ -201,20 +198,11 @@ void updateBody() {
   maxV   = std::numeric_limits<double>::min();
   minDx  = std::numeric_limits<double>::max();
 
-  // force0 = force along x direction
-  // force1 = force along y direction
-  // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
   double* newx0 = new double[NumberOfBodies]; 
   double* newx1 = new double[NumberOfBodies]; 
   double* newx2 = new double[NumberOfBodies]; 
 
   for (int i=0; i<NumberOfBodies; i++) {
-    force0[i] = 0.0;
-    force1[i] = 0.0;
-    force2[i] = 0.0;
     newx0[i] = x[i][0];
     newx1[i] = x[i][1];
     newx2[i] = x[i][2];
@@ -223,13 +211,12 @@ void updateBody() {
   for (int bucket=0; bucket<numBuckets; bucket++) {
     const int timeSteps = pow(2, bucket);
     const double deltaT = timeStepSize/timeSteps;
-    printf("deltaT: %f\n", deltaT);
     for (int ts=0; ts<timeSteps; ts++) {
-      //printf("deltaT: %f\n", deltaT);
+      double force0[NumberOfBodies] = {0.0};
+      double force1[NumberOfBodies] = {0.0};
+      double force2[NumberOfBodies] = {0.0};
       for (int j=0; j<NumberOfBodies; j++) {
         if (buckets[j] == bucket) {
-          //printf("j: %d\n", j);
-          //printf("%d %d\n", timeSteps, buckets[j]);
           for (int i=0; i<NumberOfBodies; i++) {
             if (i == j) {
               continue;
@@ -241,7 +228,6 @@ void updateBody() {
             );
 
             // x,y,z forces acting on particle 0
-            //printf("d: %f\n", distance);
             double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
             force0[j] += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
             force1[j] += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
@@ -250,7 +236,6 @@ void updateBody() {
             minDx = std::min( minDx,distance );
           }
 
-          //printf("v: %f %f %f\n", v[j][0], v[j][1], v[j][2]);
           v[j][0] += deltaT * force0[j] / mass[j];
           v[j][1] += deltaT * force1[j] / mass[j];
           v[j][2] += deltaT * force2[j] / mass[j];
@@ -264,78 +249,73 @@ void updateBody() {
           );
         }
       }
-      //printf("v: %f %f %f\n", v[j][0], v[j][1], v[j][2]);
+
+      // Perform collision detection on bodies in the current bucket against
+      // all other bodies 
       for (int i=0; i<NumberOfBodies; i++) {
-        for (int j=i+1; j<NumberOfBodies; j++) {
-          const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
-            (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
-            (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
-          const double b = 2*(
-            (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
-            (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
-            (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
-          );
-          const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
-            (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
-            (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-            (2*1e-2, 2);
-          const double det = b*b - 4*a*c;
-          if (det >= 0) {
-            double tCollide = (-b-sqrt(det))/(2*a);
-            if (tCollide < 0) {
-              tCollide = (-b+sqrt(det))/(2*a);
-            }
-            if (tCollide >= 0 && tCollide <= deltaT) {
-              const double frac = mass[j] / (mass[i]+mass[j]);
-              v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
-              v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
-              v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
-              mass[i] = mass[i] + mass[j];
-              newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
-              newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
-              newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
-              
-              // Remove object j
-              NumberOfBodies--;
-              for (int k=j; k<NumberOfBodies; k++) {
-                x[k][0] = x[k+1][0];
-                x[k][1] = x[k+1][1];
-                x[k][2] = x[k+1][2];
-                newx0[k] = newx0[k+1];
-                newx1[k] = newx1[k+1];
-                newx2[k] = newx2[k+1];
-                v[k][0] = v[k+1][0];
-                v[k][1] = v[k+1][1];
-                v[k][2] = v[k+1][2];
-                mass[k] = mass[k+1];
-                buckets[k] = buckets[k+1];
+        if (buckets[i] == bucket) {
+          for (int j=i+1; j<NumberOfBodies; j++) {
+            const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
+              (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
+              (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
+            const double b = 2*(
+              (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
+              (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
+              (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
+            );
+            const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
+              (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
+              (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
+              (2*1e-2)*(2*1e-2);
+            const double det = b*b - 4*a*c;
+            if (det >= 0) {
+              double tCollide = (-b-sqrt(det))/(2*a);
+              if (tCollide < 0) {
+                tCollide = (-b+sqrt(det))/(2*a);
+              }
+              if (tCollide >= 0 && tCollide <= deltaT) {
+                const double frac = mass[j] / (mass[i]+mass[j]);
+                v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
+                v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
+                v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
+                mass[i] = mass[i] + mass[j];
+                newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
+                newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
+                newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+                
+                // Remove object j
+                NumberOfBodies--;
+                for (int k=j; k<NumberOfBodies; k++) {
+                  x[k][0] = x[k+1][0];
+                  x[k][1] = x[k+1][1];
+                  x[k][2] = x[k+1][2];
+                  newx0[k] = newx0[k+1];
+                  newx1[k] = newx1[k+1];
+                  newx2[k] = newx2[k+1];
+                  v[k][0] = v[k+1][0];
+                  v[k][1] = v[k+1][1];
+                  v[k][2] = v[k+1][2];
+                  mass[k] = mass[k+1];
+                  buckets[k] = buckets[k+1];
+                }
               }
             }
           }
         }
+        // Update the positions of all particles in the current bucket
+        x[i][0] = newx0[i];
+        x[i][1] = newx1[i];
+        x[i][2] = newx2[i];
       }
     }
   }
 
-  for (int i=0; i<NumberOfBodies; i++) {
-    x[i][0] = newx0[i];
-    x[i][1] = newx1[i];
-    x[i][2] = newx2[i];
-  }
-
-  // These are three buggy lines of code that we will use in one of the labs
-//  x[0][3] = x[0][2] + timeStepSize * v[0][2];
-//  x[0][2] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-//  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
 
   if (NumberOfBodies == 1) {
     t = tFinal;
   }
   t += timeStepSize;
 
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
   delete[] newx0; 
   delete[] newx1; 
   delete[] newx2; 
