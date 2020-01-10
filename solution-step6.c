@@ -264,6 +264,11 @@ void updateBody() {
     const int timeSteps = pow(2, bucket);
     const double deltaT = timeStepSize/timeSteps;
     for (int ts=0; ts<timeSteps; ts++) {
+      int collisions[NumberOfBodies]; // Stores bodies that collide
+      for (int i=0; i<NumberOfBodies; i++) {
+        collisions[i] = -1; // -1 indicates no collision
+      }
+      double tCollides[NumberOfBodies]; // Stores the times of collisions
       #pragma omp parallel
       {
         double myMinDx = minDx;
@@ -312,49 +317,47 @@ void updateBody() {
           minDx = std::min(minDx, myMinDx);
           maxVSquared = std::max(maxVSquared, myMaxVSquared);
         }
-      }
+        #pragma omp barrier
 
-      // Perform collision detection on bodies in the current bucket against
-      // all other bodies 
-      int collisions[NumberOfBodies];
-      for (int i=0; i<NumberOfBodies; i++) {
-        collisions[i] = -1;
-      }
-      double tCollides[NumberOfBodies];
-      #pragma omp parallel for
-      for (int i=0; i<NumberOfBodies; i++) {
-        for (int j=i+1; j<NumberOfBodies; j++) {
-          if (buckets[i] != bucket || buckets[j] != bucket) {
-            continue;
-          }
-          const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
-            (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
-            (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
-          const double b = 2*(
-            (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
-            (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
-            (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
-          );
-          const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
-            (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
-            (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-            (2*1e-2)*(2*1e-2);
-          const double det = b*b - 4*a*c;
-          if (det < 0) {
-            continue;
-          }
-          double sqrtDet = sqrt(det);
-          double tCollide = (-b-sqrtDet)/(2*a);
-          if (tCollide < 0) {
-            tCollide = (-b+sqrtDet)/(2*a);
-          }
-          if (tCollide >= 0 && tCollide <= deltaT) {
-            collisions[i] = j;
-            tCollides[i] = tCollide;
+        // Perform collision detection on bodies in the current bucket against
+        // all other bodies
+        #pragma omp for
+        for (int i=0; i<NumberOfBodies; i++) {
+          for (int j=i+1; j<NumberOfBodies; j++) {
+            if (buckets[i] != bucket && buckets[j] != bucket) {
+              continue;
+            }
+            const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0]) +
+              (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
+              (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
+            const double b = 2*(
+              (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
+              (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
+              (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
+            );
+            const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
+              (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
+              (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
+              (2*1e-2)*(2*1e-2);
+            const double det = b*b - 4*a*c;
+            if (det < 0) {
+              continue;
+            }
+            double sqrtDet = sqrt(det);
+            double tCollide = (-b-sqrtDet)/(2*a);
+            if (tCollide < 0) {
+              tCollide = (-b+sqrtDet)/(2*a);
+            }
+            if (tCollide >= 0 && tCollide <= deltaT) {
+              collisions[i] = j;
+              tCollides[i] = tCollide;
+            }
           }
         }
       }
 
+      // End of parallel section
+      // Caculate positions and velocities of fused particles
       for (int i=0; i<NumberOfBodies; i++) {
         int j = collisions[i];
         if (j != -1) {
@@ -367,6 +370,7 @@ void updateBody() {
           newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
           newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
           newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+          buckets[i] = bucket;
           
           // Remove object j
           NumberOfBodies--;
@@ -386,10 +390,15 @@ void updateBody() {
             tCollides[k] = tCollides[k+1];
           }
         }
-        // Update the positions of all particles in the current bucket
-        x[i][0] = newx0[i];
-        x[i][1] = newx1[i];
-        x[i][2] = newx2[i];
+      }
+
+      // Update the positions of all particles in the current bucket
+      for (int i=0; i<NumberOfBodies; i++) {
+        if (buckets[i] == bucket) {
+          x[i][0] = newx0[i];
+          x[i][1] = newx1[i];
+          x[i][2] = newx2[i];
+        }
       }
     }
   }
