@@ -233,7 +233,7 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
-  const int numBuckets = 1;
+  const int numBuckets = 10;
   const double vBucket = maxV/numBuckets;
   int buckets[NumberOfBodies];
   #pragma omp parallel

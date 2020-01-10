@@ -182,7 +182,7 @@ void updateBody() {
   const int numBuckets = 10;
   const int timeSteps = pow(2, numBuckets-1);
   const double vBucket = maxV/numBuckets;
-  int* buckets = new int[NumberOfBodies];
+  int buckets[NumberOfBodies];
   //printf("timeSteps: %d\n", timeSteps);
   //printf("vBucket: %f\n", vBucket);
   //printf("maxV: %f\n", maxV);
@@ -202,26 +202,23 @@ void updateBody() {
   maxV   = std::numeric_limits<double>::min();
   minDx  = std::numeric_limits<double>::max();
 
-  // force0 = force along x direction
-  // force1 = force along y direction
-  // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
   double* newx0 = new double[NumberOfBodies]; 
   double* newx1 = new double[NumberOfBodies]; 
   double* newx2 = new double[NumberOfBodies]; 
 
   for (int i=0; i<NumberOfBodies; i++) {
-    force0[i] = 0.0;
-    force1[i] = 0.0;
-    force2[i] = 0.0;
     newx0[i] = x[i][0];
     newx1[i] = x[i][1];
     newx2[i] = x[i][2];
   }
 
   for (int ts=0; ts<timeSteps; ts++) {
+    // force0 = force along x direction
+    // force1 = force along y direction
+    // force2 = force along z direction
+    double force0[NumberOfBodies] = {0.0};
+    double force1[NumberOfBodies] = {0.0};
+    double force2[NumberOfBodies] = {0.0};
     const double deltaT = timeStepSize/timeSteps;
     //printf("deltaT: %f\n", deltaT);
     for (int j=0; j<NumberOfBodies; j++) {
@@ -278,7 +275,7 @@ void updateBody() {
         const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
           (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
           (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-          (2*1e-2, 2);
+          (2*1e-2)*(2*1e-2);
         const double det = b*b - 4*a*c;
         if (det >= 0) {
           double tCollide = (-b-sqrt(det))/(2*a);
@@ -329,9 +326,6 @@ void updateBody() {
   }
   t += timeStepSize;
 
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
   delete[] newx0; 
   delete[] newx1; 
   delete[] newx2; 

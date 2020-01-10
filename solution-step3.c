@@ -16,10 +16,13 @@
 #include <sstream>
 #include <iostream>
 #include <string>
+#include <cstring>
+#include <string.h>
 #include <math.h>
 #include <limits>
 #include <iomanip>
-
+#include <omp.h>
+#include <vector>
 
 double t          = 0;
 double tFinal     = 0;
@@ -66,35 +69,86 @@ double   minDx;
  * This operation is not to be changed in the assignment.
  */
 void setUp(int argc, char** argv) {
-  NumberOfBodies = (argc-4) / 7;
-
-  x    = new double*[NumberOfBodies];
-  v    = new double*[NumberOfBodies];
-  mass = new double [NumberOfBodies];
-
   int readArgument = 1;
 
   tPlotDelta   = std::stof(argv[readArgument]); readArgument++;
   tFinal       = std::stof(argv[readArgument]); readArgument++;
   timeStepSize = std::stof(argv[readArgument]); readArgument++;
 
-  for (int i=0; i<NumberOfBodies; i++) {
-    x[i] = new double[3];
-    v[i] = new double[3];
-
-    x[i][0] = std::stof(argv[readArgument]); readArgument++;
-    x[i][1] = std::stof(argv[readArgument]); readArgument++;
-    x[i][2] = std::stof(argv[readArgument]); readArgument++;
-
-    v[i][0] = std::stof(argv[readArgument]); readArgument++;
-    v[i][1] = std::stof(argv[readArgument]); readArgument++;
-    v[i][2] = std::stof(argv[readArgument]); readArgument++;
-
-    mass[i] = std::stof(argv[readArgument]); readArgument++;
-
-    if (mass[i]<=0.0 ) {
-      std::cerr << "invalid mass for body " << i << std::endl;
+  if (argc == 5) {
+    std::string line;
+    std::ifstream dataFile (argv[4]);
+    if (dataFile.is_open()) {
+      getline(dataFile, line);
+      dataFile.close();
+    } else {
+      std::cerr << "Unable to open file " << argv[4] << '\n';
       exit(-2);
+    }
+    char delim[] = " ";
+    char delim2[] = "      ";
+    char lineCStr[line.size()+1];
+    std::strcpy(lineCStr, line.c_str());
+    char * ptr = strtok(lineCStr, delim2);
+    std::vector<double*> xVector;
+    std::vector<double*> vVector;
+    std::vector<double> massVector;
+    NumberOfBodies = 0;
+    while (ptr != NULL) {
+      double* xi = new double[3];
+      double* vi = new double[3];
+      xi[0] = std::stof(ptr);
+      xi[1] = std::stof(strtok(NULL, delim));
+      xi[2] = std::stof(strtok(NULL, delim));
+      xVector.push_back(xi);
+
+      vi[0] = std::stof(strtok(NULL, delim));
+      vi[1] = std::stof(strtok(NULL, delim));
+      vi[2] = std::stof(strtok(NULL, delim));
+      vVector.push_back(vi);
+
+      massVector.push_back(std::stof(strtok(NULL, delim)));
+
+      if (massVector.back()<=0.0 ) {
+        std::cerr << "invalid mass for body " << NumberOfBodies << std::endl;
+        exit(-2);
+      }
+      ptr = strtok(NULL, delim2);
+      //printf("%f %f %f %f %f %f %f\n", xi[0], xi[1], xi[2], vi[0], vi[1], vi[2], massVector.back());
+      NumberOfBodies ++;
+    }
+    x    = new double*[NumberOfBodies];
+    v    = new double*[NumberOfBodies];
+    mass = new double [NumberOfBodies];
+    for (int i=0; i<NumberOfBodies; i++) {
+      x[i] = xVector.at(i);
+      v[i] = vVector.at(i);
+      mass[i] = massVector.at(i);
+    }
+  } else {
+    NumberOfBodies = (argc-4) / 7;
+    x    = new double*[NumberOfBodies];
+    v    = new double*[NumberOfBodies];
+    mass = new double [NumberOfBodies];
+
+    for (int i=0; i<NumberOfBodies; i++) {
+      x[i] = new double[3];
+      v[i] = new double[3];
+
+      x[i][0] = std::stof(argv[readArgument]); readArgument++;
+      x[i][1] = std::stof(argv[readArgument]); readArgument++;
+      x[i][2] = std::stof(argv[readArgument]); readArgument++;
+
+      v[i][0] = std::stof(argv[readArgument]); readArgument++;
+      v[i][1] = std::stof(argv[readArgument]); readArgument++;
+      v[i][2] = std::stof(argv[readArgument]); readArgument++;
+
+      mass[i] = std::stof(argv[readArgument]); readArgument++;
+
+      if (mass[i]<=0.0 ) {
+        std::cerr << "invalid mass for body " << i << std::endl;
+        exit(-2);
+      }
     }
   }
 
@@ -195,7 +249,8 @@ void updateBody() {
     }
   }
 
-  maxV   = 0.0;;
+  maxV   = 0.0;
+  double maxVSquared = 0.0;
   minDx  = std::numeric_limits<double>::max();
 
   double newx0[NumberOfBodies];
@@ -206,102 +261,108 @@ void updateBody() {
     const int timeSteps = pow(2, bucket);
     const double deltaT = timeStepSize/timeSteps;
     for (int ts=0; ts<timeSteps; ts++) {
-      double force0[NumberOfBodies] = {0.0};
-      double force1[NumberOfBodies] = {0.0};
-      double force2[NumberOfBodies] = {0.0};
       for (int j=0; j<NumberOfBodies; j++) {
-        if (buckets[j] == bucket) {
-          for (int i=0; i<NumberOfBodies; i++) {
-            if (i == j) {
-              continue;
-            }
-            const double distance = sqrt(
-              (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
-              (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
-              (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
-            );
-
-            double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
-            force0[j] += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
-            force1[j] += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
-            force2[j] += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
-
-            minDx = std::min( minDx,distance );
-          }
-
-          v[j][0] += deltaT * force0[j] / mass[j];
-          v[j][1] += deltaT * force1[j] / mass[j];
-          v[j][2] += deltaT * force2[j] / mass[j];
-
-          newx0[j] = x[j][0] + deltaT * v[j][0];
-          newx1[j] = x[j][1] + deltaT * v[j][1];
-          newx2[j] = x[j][2] + deltaT * v[j][2];
-          maxV = std::max(
-            maxV,
-            std::sqrt( v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2] )
-          );
+        if (buckets[j] != bucket) {
+          continue;
         }
+        double f0 = 0;
+        double f1 = 0;
+        double f2 = 0;
+        for (int i=0; i<NumberOfBodies; i++) {
+          if (i == j) {
+            continue;
+          }
+          const double distance = sqrt(
+            (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
+            (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
+            (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
+          );
+
+          double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
+          f0 += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
+          f1 += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
+          f2 += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
+
+          minDx = std::min( minDx,distance );
+        }
+
+        v[j][0] += deltaT * f0 / mass[j];
+        v[j][1] += deltaT * f1 / mass[j];
+        v[j][2] += deltaT * f2 / mass[j];
+
+        newx0[j] = x[j][0] + deltaT * v[j][0];
+        newx1[j] = x[j][1] + deltaT * v[j][1];
+        newx2[j] = x[j][2] + deltaT * v[j][2];
+        maxVSquared = std::max(
+          maxVSquared,
+          v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2]
+        );
       }
 
       // Perform collision detection on bodies in the current bucket against
       // all other bodies 
       for (int i=0; i<NumberOfBodies; i++) {
-        if (buckets[i] == bucket) {
-          for (int j=i+1; j<NumberOfBodies; j++) {
-            const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
-              (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
-              (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
-            const double b = 2*(
-              (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
-              (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
-              (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
-            );
-            const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
-              (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
-              (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-              (2*1e-2)*(2*1e-2);
-            const double det = b*b - 4*a*c;
-            if (det >= 0) {
-              double tCollide = (-b-sqrt(det))/(2*a);
-              if (tCollide < 0) {
-                tCollide = (-b+sqrt(det))/(2*a);
-              }
-              if (tCollide >= 0 && tCollide <= deltaT) {
-                const double frac = mass[j] / (mass[i]+mass[j]);
-                v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
-                v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
-                v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
-                mass[i] = mass[i] + mass[j];
-                newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
-                newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
-                newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
-                
-                // Remove object j
-                NumberOfBodies--;
-                for (int k=j; k<NumberOfBodies; k++) {
-                  x[k][0] = x[k+1][0];
-                  x[k][1] = x[k+1][1];
-                  x[k][2] = x[k+1][2];
-                  newx0[k] = newx0[k+1];
-                  newx1[k] = newx1[k+1];
-                  newx2[k] = newx2[k+1];
-                  v[k][0] = v[k+1][0];
-                  v[k][1] = v[k+1][1];
-                  v[k][2] = v[k+1][2];
-                  mass[k] = mass[k+1];
-                  buckets[k] = buckets[k+1];
-                }
-              }
-            }
+        for (int j=i+1; j<NumberOfBodies; j++) {
+          if (buckets[i] != bucket || buckets[j] != bucket) {
+            continue;
           }
-          // Update the positions of all particles in the current bucket
-          x[i][0] = newx0[i];
-          x[i][1] = newx1[i];
-          x[i][2] = newx2[i];
+          const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
+            (v[i][1]-v[j][1]) * (v[i][1]-v[j][1]) +
+            (v[i][2]-v[j][2]) * (v[i][2]-v[j][2]);
+          const double b = 2*(
+            (x[i][0]-x[j][0]) * (v[i][0]-v[j][0]) +
+            (x[i][1]-x[j][1]) * (v[i][1]-v[j][1]) +
+            (x[i][2]-x[j][2]) * (v[i][2]-v[j][2])
+          );
+          const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
+            (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
+            (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
+            (2*1e-2)*(2*1e-2);
+          const double det = b*b - 4*a*c;
+          if (det < 0) {
+            continue;
+          }
+          double tCollide = (-b-sqrt(det))/(2*a);
+          if (tCollide < 0) {
+            tCollide = (-b+sqrt(det))/(2*a);
+          }
+          if (tCollide < 0 || tCollide > deltaT) {
+            continue;
+          }
+          const double frac = mass[j] / (mass[i]+mass[j]);
+          v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
+          v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
+          v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
+          mass[i] = mass[i] + mass[j];
+          newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
+          newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
+          newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+          
+          // Remove object j
+          NumberOfBodies--;
+          for (int k=j; k<NumberOfBodies; k++) {
+            x[k][0] = x[k+1][0];
+            x[k][1] = x[k+1][1];
+            x[k][2] = x[k+1][2];
+            newx0[k] = newx0[k+1];
+            newx1[k] = newx1[k+1];
+            newx2[k] = newx2[k+1];
+            v[k][0] = v[k+1][0];
+            v[k][1] = v[k+1][1];
+            v[k][2] = v[k+1][2];
+            mass[k] = mass[k+1];
+            buckets[k] = buckets[k+1];
+          }
         }
+        // Update the positions of all particles in the current bucket
+        x[i][0] = newx0[i];
+        x[i][1] = newx1[i];
+        x[i][2] = newx2[i];
       }
     }
   }
+
+  maxV = std::sqrt(maxVSquared);
 
   if (NumberOfBodies == 1) {
     t = tFinal;
@@ -322,8 +383,7 @@ int main(int argc, char** argv) {
               << "  final-time      simulated time (greater 0)" << std::endl
               << "  dt              time step size (greater 0)" << std::endl
               << std::endl
-              << "Examples:" << std::endl
-              << "0.01  100.0  0.001    0.0 0.0 0.0  1.0 0.0 0.0  1.0 \t One body moving form the coordinate system's centre along x axis with speed 1" << std::endl
+              << "Examples:" << std::endl << "0.01  100.0  0.001    0.0 0.0 0.0  1.0 0.0 0.0  1.0 \t One body moving form the coordinate system's centre along x axis with speed 1" << std::endl
               << "0.01  100.0  0.001    0.0 0.0 0.0  1.0 0.0 0.0  1.0     0.0 1.0 0.0  1.0 0.0 0.0  1.0  \t One spiralling around the other one" << std::endl
               << "0.01  100.0  0.001    3.0 0.0 0.0  0.0 1.0 0.0  0.4     0.0 0.0 0.0  0.0 0.0 0.0  0.2     2.0 0.0 0.0  0.0 0.0 0.0  1.0 \t Three body setup from first lecture" << std::endl
               << "0.01  100.0  0.001    3.0 0.0 0.0  0.0 1.0 0.0  0.4     0.0 0.0 0.0  0.0 0.0 0.0  0.2     2.0 0.0 0.0  0.0 0.0 0.0  1.0     2.0 1.0 0.0  0.0 0.0 0.0  1.0     2.0 0.0 1.0  0.0 0.0 0.0  1.0 \t Five body setup" << std::endl
@@ -332,7 +392,7 @@ int main(int argc, char** argv) {
 
     return -1;
   }
-  else if ( (argc-4)%7!=0 ) {
+  else if ( !((argc-4)%7==0 || argc ==5 )) {
     std::cerr << "error in arguments: each planet is given by seven entries (position, velocity, mass)" << std::endl;
     std::cerr << "got " << argc << " arguments (three of them are reserved)" << std::endl;
     std::cerr << "run without arguments for usage instruction" << std::endl;
@@ -357,7 +417,7 @@ int main(int argc, char** argv) {
     updateBody();
     timeStepCounter++;
     if (t >= tPlot) {
-      printParaviewSnapshot();
+      //printParaviewSnapshot();
       std::cout << "plot next snapshot"
     		    << ",\t time step=" << timeStepCounter
     		    << ",\t t="         << t

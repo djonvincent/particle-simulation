@@ -240,15 +240,9 @@ void updateBody() {
   // force0 = force along x direction
   // force1 = force along y direction
   // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
-
-  for (int i=0; i<NumberOfBodies; i++) {
-    force0[i] = 0.0;
-    force1[i] = 0.0;
-    force2[i] = 0.0;
-  }
+  double force0[NumberOfBodies] = {0.0};
+  double force1[NumberOfBodies] = {0.0};
+  double force2[NumberOfBodies] = {0.0};
 
   for (int j=0; j<NumberOfBodies; j++) {
     for (int i=j+1; i<NumberOfBodies; i++) {
@@ -291,16 +285,7 @@ void updateBody() {
     x[i][2] += timeStepSize * v[i][2];
   }
 
-  // These are three buggy lines of code that we will use in one of the labs
-//  x[0][3] = x[0][2] + timeStepSize * v[0][2];
-//  x[0][2] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-//  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-
   t += timeStepSize;
-
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
 }
 
 

@@ -247,9 +247,10 @@ void updateBody() {
         (2*1e-2)*(2*1e-2);
       const double det = b*b - 4*a*c;
       if (det >= 0) {
-        double tCollide = (-b-sqrt(det))/(2*a);
+        double sqrtDet = sqrt(det);
+        double tCollide = (-b-sqrtDet)/(2*a);
         if (tCollide < 0) {
-          tCollide = (-b+sqrt(det))/(2*a);
+          tCollide = (-b+sqrtDet)/(2*a);
         }
         if (tCollide >= 0 && tCollide <= timeStepSize) {
           std::cout << "tCollide: " << tCollide << "\n";
@@ -283,11 +284,6 @@ void updateBody() {
     x[i][1] = newx1[i];
     x[i][2] = newx2[i];
   }
-
-  // These are three buggy lines of code that we will use in one of the labs
-//  x[0][3] = x[0][2] + timeStepSize * v[0][2];
-//  x[0][2] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-//  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
 
   if (NumberOfBodies == 1) {
     t = tFinal;
