@@ -283,7 +283,9 @@ void updateBody() {
           f1 += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
           f2 += (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
 
-          minDx = std::min( minDx,distance );
+          if (ts == timeSteps-1) {
+            minDx = std::min( minDx,distance );
+          }
         }
 
         v[j][0] += deltaT * f0 / mass[j];
@@ -293,16 +295,18 @@ void updateBody() {
         newx0[j] = x[j][0] + deltaT * v[j][0];
         newx1[j] = x[j][1] + deltaT * v[j][1];
         newx2[j] = x[j][2] + deltaT * v[j][2];
-        maxVSquared = std::max(
-          maxVSquared,
-          v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2]
-        );
       }
 
       // Perform collision detection on bodies in the current bucket against
       // all other bodies 
+      int collisions[NumberOfBodies]; // Stores bodies that collide
+      for (int i=0; i<NumberOfBodies; i++) {
+        collisions[i] = -1; // -1 indicates no collision
+      }
+      double tCollides[NumberOfBodies]; // Stores the times of collisions
       for (int i=0; i<NumberOfBodies; i++) {
         for (int j=i+1; j<NumberOfBodies; j++) {
+          // Skip if either object not in the bucket
           if (buckets[i] != bucket && buckets[j] != bucket) {
             continue;
           }
@@ -322,47 +326,67 @@ void updateBody() {
           if (det < 0) {
             continue;
           }
-          double tCollide = (-b-sqrt(det))/(2*a);
+          double sqrtDet = sqrt(det);
+          double tCollide = (-b-sqrtDet)/(2*a);
           if (tCollide < 0) {
-            tCollide = (-b+sqrt(det))/(2*a);
+            tCollide = (-b+sqrtDet)/(2*a);
           }
-          if (tCollide < 0 || tCollide > deltaT) {
-            continue;
-          }
-          const double frac = mass[j] / (mass[i]+mass[j]);
-          v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
-          v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
-          v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
-          mass[i] = mass[i] + mass[j];
-          newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
-          newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
-          newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
-          buckets[i] = bucket;
-          
-          // Remove object j
-          NumberOfBodies--;
-          for (int k=j; k<NumberOfBodies; k++) {
-            x[k][0] = x[k+1][0];
-            x[k][1] = x[k+1][1];
-            x[k][2] = x[k+1][2];
-            newx0[k] = newx0[k+1];
-            newx1[k] = newx1[k+1];
-            newx2[k] = newx2[k+1];
-            v[k][0] = v[k+1][0];
-            v[k][1] = v[k+1][1];
-            v[k][2] = v[k+1][2];
-            mass[k] = mass[k+1];
-            buckets[k] = buckets[k+1];
+          if (tCollide >= 0 && tCollide <= deltaT) {
+            collisions[i] = j;
+            tCollides[i] = tCollide;
+            break;
           }
         }
       }
 
-      // Update the positions of all particles in the current bucket
+      // Caculate positions and velocities of fused particles
+      for (int i=0; i<NumberOfBodies; i++) {
+        int j = collisions[i];
+        if (j == -1) {
+          continue;
+        }
+        double tCollide = tCollides[i];
+        const double frac = mass[j] / (mass[i]+mass[j]);
+        v[i][0] = frac * v[j][0] + (1-frac) * v[i][0];
+        v[i][1] = frac * v[j][1] + (1-frac) * v[i][1];
+        v[i][2] = frac * v[j][2] + (1-frac) * v[i][2];
+        mass[i] = mass[i] + mass[j];
+        newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
+        newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
+        newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+        buckets[i] = bucket;
+
+        // Remove object j
+        NumberOfBodies--;
+        for (int k=j; k<NumberOfBodies; k++) {
+          x[k][0] = x[k+1][0];
+          x[k][1] = x[k+1][1];
+          x[k][2] = x[k+1][2];
+          newx0[k] = newx0[k+1];
+          newx1[k] = newx1[k+1];
+          newx2[k] = newx2[k+1];
+          v[k][0] = v[k+1][0];
+          v[k][1] = v[k+1][1];
+          v[k][2] = v[k+1][2];
+          mass[k] = mass[k+1];
+          buckets[k] = buckets[k+1];
+          collisions[k] = collisions[k+1];
+          tCollides[k] = tCollides[k+1];
+        }
+      }
+
+      // Update the positions and maxV of all particles in the current bucket
       for (int i=0; i<NumberOfBodies; i++) {
         if (buckets[i] == bucket) {
           x[i][0] = newx0[i];
           x[i][1] = newx1[i];
           x[i][2] = newx2[i];
+          if (ts == timeSteps-1) {
+            maxVSquared = std::max(
+              maxVSquared,
+              v[i][0]*v[i][0] + v[i][1]*v[i][1] + v[i][2]*v[i][2]
+            );
+          }
         }
       }
     }
