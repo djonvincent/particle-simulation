@@ -303,7 +303,7 @@ void updateBody() {
       // all other bodies 
       for (int i=0; i<NumberOfBodies; i++) {
         for (int j=i+1; j<NumberOfBodies; j++) {
-          if (buckets[i] != bucket || buckets[j] != bucket) {
+          if (buckets[i] != bucket && buckets[j] != bucket) {
             continue;
           }
           const double a = (v[i][0]-v[j][0]) * (v[i][0]-v[j][0])  + 
@@ -337,6 +337,7 @@ void updateBody() {
           newx0[i] = (x[j][0] + x[i][0] + (v[j][0] + v[i][0])*tCollide) / 2;
           newx1[i] = (x[j][1] + x[i][1] + (v[j][1] + v[i][1])*tCollide) / 2;
           newx2[i] = (x[j][2] + x[i][2] + (v[j][2] + v[i][2])*tCollide) / 2;
+          buckets[i] = bucket;
           
           // Remove object j
           NumberOfBodies--;
@@ -354,10 +355,15 @@ void updateBody() {
             buckets[k] = buckets[k+1];
           }
         }
-        // Update the positions of all particles in the current bucket
-        x[i][0] = newx0[i];
-        x[i][1] = newx1[i];
-        x[i][2] = newx2[i];
+      }
+
+      // Update the positions of all particles in the current bucket
+      for (int i=0; i<NumberOfBodies; i++) {
+        if (buckets[i] == bucket) {
+          x[i][0] = newx0[i];
+          x[i][1] = newx1[i];
+          x[i][2] = newx2[i];
+        }
       }
     }
   }
@@ -417,7 +423,7 @@ int main(int argc, char** argv) {
     updateBody();
     timeStepCounter++;
     if (t >= tPlot) {
-      //printParaviewSnapshot();
+      printParaviewSnapshot();
       std::cout << "plot next snapshot"
     		    << ",\t time step=" << timeStepCounter
     		    << ",\t t="         << t
