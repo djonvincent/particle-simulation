@@ -245,6 +245,9 @@ void updateBody() {
   double force2[NumberOfBodies] = {0.0};
 
   for (int j=0; j<NumberOfBodies; j++) {
+    double fj0 = force0[j];
+    double fj1 = force1[j];
+    double fj2 = force2[j];
     for (int i=j+1; i<NumberOfBodies; i++) {
       const double distance = sqrt(
         (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
@@ -252,15 +255,14 @@ void updateBody() {
         (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
       );
 
-      // x,y,z forces acting on particle 0
       double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
       const double f0 = (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
       const double f1 = (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
       const double f2 = (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
 
-      force0[j] += f0; 
-      force1[j] += f1; 
-      force2[j] += f2; 
+      fj0 += f0;
+      fj1 += f1;
+      fj2 += f2;
       force0[i] -= f0; 
       force1[i] -= f1; 
       force2[i] -= f2; 
@@ -268,9 +270,9 @@ void updateBody() {
       minDx = std::min( minDx,distance );
     }
 
-    v[j][0] += timeStepSize * force0[j] / mass[j];
-    v[j][1] += timeStepSize * force1[j] / mass[j];
-    v[j][2] += timeStepSize * force2[j] / mass[j];
+    v[j][0] += timeStepSize * fj0 / mass[j];
+    v[j][1] += timeStepSize * fj1 / mass[j];
+    v[j][2] += timeStepSize * fj2 / mass[j];
     maxVSquared = std::max(
       maxVSquared,
       v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2]
