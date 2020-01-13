@@ -264,7 +264,7 @@ void updateBody() {
       const double c = (x[i][0]-x[j][0]) * (x[i][0]-x[j][0]) +
         (x[i][1]-x[j][1]) * (x[i][1]-x[j][1]) +
         (x[i][2]-x[j][2]) * (x[i][2]-x[j][2]) -
-        (2*1e-2)*(2*1e-2);
+        (1e-2)*(1e-2);
       const double det = b*b - 4*a*c;
       if (det < 0) { // No solution
         continue;
