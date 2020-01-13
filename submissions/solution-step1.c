@@ -180,54 +180,68 @@ void printParaviewSnapshot() {
  */
 void updateBody() {
   maxV   = 0.0;
+  double maxVSquared = 0.0;
   minDx  = std::numeric_limits<double>::max();
 
   // force0 = force along x direction
   // force1 = force along y direction
   // force2 = force along z direction
-  double* force0 = new double[NumberOfBodies];
-  double* force1 = new double[NumberOfBodies];
-  double* force2 = new double[NumberOfBodies];
+  double force0[NumberOfBodies] = {0.0};
+  double force1[NumberOfBodies] = {0.0};
+  double force2[NumberOfBodies] = {0.0};
 
-  force0[0] = 0.0;
-  force1[0] = 0.0;
-  force2[0] = 0.0;
+  for (int j=0; j<NumberOfBodies; j++) {
+    double fj0 = force0[j];
+    double fj1 = force1[j];
+    double fj2 = force2[j];
+    for (int i=j+1; i<NumberOfBodies; i++) {
+      const double distance = sqrt(
+        (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
+        (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
+        (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
+      );
 
-  for (int i=1; i<NumberOfBodies; i++) {
-    const double distance = sqrt(
-      (x[0][0]-x[i][0]) * (x[0][0]-x[i][0]) +
-      (x[0][1]-x[i][1]) * (x[0][1]-x[i][1]) +
-      (x[0][2]-x[i][2]) * (x[0][2]-x[i][2])
+      // Calculate the forces between object i and j
+      double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
+      const double f0 = (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
+      const double f1 = (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
+      const double f2 = (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
+
+      // Add forces to object j
+      // Optimise by eliminating array access for object j
+      fj0 += f0;
+      fj1 += f1;
+      fj2 += f2;
+      // Add equal and opposite force to object i
+      force0[i] -= f0; 
+      force1[i] -= f1; 
+      force2[i] -= f2; 
+
+      minDx = std::min( minDx,distance );
+    }
+
+    // Update velocity of object j
+    v[j][0] += timeStepSize * fj0 / mass[j];
+    v[j][1] += timeStepSize * fj1 / mass[j];
+    v[j][2] += timeStepSize * fj2 / mass[j];
+
+    // Update new position of object j
+    maxVSquared = std::max(
+      maxVSquared,
+      v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2]
     );
-
-    // x,y,z forces acting on particle 0
-    force0[0] += (x[i][0]-x[0][0]) * mass[i]*mass[0] / distance / distance / distance ;
-    force1[0] += (x[i][1]-x[0][1]) * mass[i]*mass[0] / distance / distance / distance ;
-    force2[0] += (x[i][2]-x[0][2]) * mass[i]*mass[0] / distance / distance / distance ;
-
-    minDx = std::min( minDx,distance );
   }
 
-  x[0][0] = x[0][0] + timeStepSize * v[0][0];
-  x[0][1] = x[0][1] + timeStepSize * v[0][1];
-  x[0][2] = x[0][2] + timeStepSize * v[0][2];
+  maxV = std::sqrt(maxVSquared);
 
-  // These are three buggy lines of code that we will use in one of the labs
-//  x[0][3] = x[0][2] + timeStepSize * v[0][2];
-//  x[0][2] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-//  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-
-  v[0][0] = v[0][0] + timeStepSize * force0[0] / mass[0];
-  v[0][1] = v[0][1] + timeStepSize * force1[0] / mass[0];
-  v[0][2] = v[0][2] + timeStepSize * force2[0] / mass[0];
-
-  maxV = std::sqrt( v[0][0]*v[0][0] + v[0][1]*v[0][1] + v[0][2]*v[0][2] );
+  // Update positions of all objects
+  for (int i=0; i<NumberOfBodies; i++) {
+    x[i][0] += timeStepSize * v[i][0];
+    x[i][1] += timeStepSize * v[i][1];
+    x[i][2] += timeStepSize * v[i][2];
+  }
 
   t += timeStepSize;
-
-  delete[] force0;
-  delete[] force1;
-  delete[] force2;
 }
 
 
