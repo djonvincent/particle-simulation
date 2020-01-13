@@ -323,9 +323,6 @@ void updateBody() {
 
         // Perform collision detection on bodies in the current bucket against
         // all other bodies
-      }
-        #pragma omp parallel
-      {
         #pragma omp for
         for (int i=0; i<NumberOfBodies; i++) {
           for (int j=i+1; j<NumberOfBodies; j++) {
