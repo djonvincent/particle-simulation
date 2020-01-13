@@ -179,6 +179,11 @@ void printParaviewSnapshot() {
  * This is the only operation you are allowed to change in the assignment.
  */
 void updateBody() {
+  if (NumberOfBodies == 1) {
+    std::cout << x[0][0] << ", " << x[0][1] << ", " << x[0][2] << std::endl;
+    closeParaviewVideoFile();
+    exit(0);
+  }
   maxV = 0.0;
   double maxVSquared = 0.0;
   minDx  = std::numeric_limits<double>::max();
@@ -312,9 +317,6 @@ void updateBody() {
   }
 
   maxV = std::sqrt(maxVSquared);
-  if (NumberOfBodies == 1) {
-    t = tFinal;
-  }
   t += timeStepSize;
 }
 
@@ -373,14 +375,12 @@ int main(int argc, char** argv) {
 				<< ",\t dt="        << timeStepSize
 				<< ",\t v_max="     << maxV
 				<< ",\t dx_min="    << minDx
-				<< ",\t n="         << NumberOfBodies
 				<< std::endl;
 
       tPlot += tPlotDelta;
     }
   }
 
-  std::cout << x[0][0] << ", " << x[0][1] << ", " << x[0][2] << std::endl;
   closeParaviewVideoFile();
 
   return 0;
