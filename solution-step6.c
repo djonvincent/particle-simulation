@@ -467,7 +467,7 @@ int main(int argc, char** argv) {
     updateBody();
     timeStepCounter++;
     if (t >= tPlot) {
-      //printParaviewSnapshot();
+      printParaviewSnapshot();
       std::cout << "plot next snapshot"
     		    << ",\t time step=" << timeStepCounter
     		    << ",\t t="         << t

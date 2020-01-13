@@ -237,11 +237,14 @@ void updateBody() {
   double maxVSquared = 0.0;
   minDx  = std::numeric_limits<double>::max();
 
+  double newx0[NumberOfBodies];
+  double newx1[NumberOfBodies];
+  double newx2[NumberOfBodies];
+
   #pragma omp parallel
   {
     double myMinDx = minDx;
     double myMaxVSquared = 0.0;
-    //double** myV = new double*[NumberOfBodies];
     #pragma omp for
     for (int j=0; j<NumberOfBodies; j++) {
       double f0 = 0;
@@ -257,7 +260,6 @@ void updateBody() {
           (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
         );
 
-        // x,y,z forces acting on particle 0
         double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
         f0 += (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
         f1 += (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
@@ -268,6 +270,10 @@ void updateBody() {
       v[j][0] += timeStepSize * f0 / mass[j];
       v[j][1] += timeStepSize * f1 / mass[j];
       v[j][2] += timeStepSize * f2 / mass[j];
+
+      newx0[j] = x[j][0] + v[j][0] * timeStepSize;
+      newx1[j] = x[j][1] + v[j][1] * timeStepSize;
+      newx2[j] = x[j][2] + v[j][2] * timeStepSize;
 
       myMaxVSquared = std::max(
           myMaxVSquared,
@@ -284,15 +290,10 @@ void updateBody() {
   maxV = std::sqrt(maxVSquared);
 
   for (int i=0; i<NumberOfBodies; i++) {
-    x[i][0] += timeStepSize * v[i][0];
-    x[i][1] += timeStepSize * v[i][1];
-    x[i][2] += timeStepSize * v[i][2];
+    x[i][0] = newx0[i];
+    x[i][1] = newx1[i];
+    x[i][2] = newx2[i];
   }
-
-  // These are three buggy lines of code that we will use in one of the labs
-//  x[0][3] = x[0][2] + timeStepSize * v[0][2];
-//  x[0][2] = x[0][2] + timeStepSize * v[0][2] / 0.0;
-//  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
 
   t += timeStepSize;
 }
