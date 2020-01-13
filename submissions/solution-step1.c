@@ -16,13 +16,10 @@
 #include <sstream>
 #include <iostream>
 #include <string>
-#include <cstring>
-#include <string.h>
 #include <math.h>
 #include <limits>
 #include <iomanip>
-#include <omp.h>
-#include <vector>
+
 
 double t          = 0;
 double tFinal     = 0;
@@ -69,86 +66,35 @@ double   minDx;
  * This operation is not to be changed in the assignment.
  */
 void setUp(int argc, char** argv) {
+  NumberOfBodies = (argc-4) / 7;
+
+  x    = new double*[NumberOfBodies];
+  v    = new double*[NumberOfBodies];
+  mass = new double [NumberOfBodies];
+
   int readArgument = 1;
 
   tPlotDelta   = std::stof(argv[readArgument]); readArgument++;
   tFinal       = std::stof(argv[readArgument]); readArgument++;
   timeStepSize = std::stof(argv[readArgument]); readArgument++;
 
-  if (argc == 5) {
-    std::string line;
-    std::ifstream dataFile (argv[4]);
-    if (dataFile.is_open()) {
-      getline(dataFile, line);
-      dataFile.close();
-    } else {
-      std::cerr << "Unable to open file " << argv[4] << '\n';
+  for (int i=0; i<NumberOfBodies; i++) {
+    x[i] = new double[3];
+    v[i] = new double[3];
+
+    x[i][0] = std::stof(argv[readArgument]); readArgument++;
+    x[i][1] = std::stof(argv[readArgument]); readArgument++;
+    x[i][2] = std::stof(argv[readArgument]); readArgument++;
+
+    v[i][0] = std::stof(argv[readArgument]); readArgument++;
+    v[i][1] = std::stof(argv[readArgument]); readArgument++;
+    v[i][2] = std::stof(argv[readArgument]); readArgument++;
+
+    mass[i] = std::stof(argv[readArgument]); readArgument++;
+
+    if (mass[i]<=0.0 ) {
+      std::cerr << "invalid mass for body " << i << std::endl;
       exit(-2);
-    }
-    char delim[] = " ";
-    char delim2[] = "      ";
-    char lineCStr[line.size()+1];
-    std::strcpy(lineCStr, line.c_str());
-    char * ptr = strtok(lineCStr, delim2);
-    std::vector<double*> xVector;
-    std::vector<double*> vVector;
-    std::vector<double> massVector;
-    NumberOfBodies = 0;
-    while (ptr != NULL) {
-      double* xi = new double[3];
-      double* vi = new double[3];
-      xi[0] = std::stof(ptr);
-      xi[1] = std::stof(strtok(NULL, delim));
-      xi[2] = std::stof(strtok(NULL, delim));
-      xVector.push_back(xi);
-
-      vi[0] = std::stof(strtok(NULL, delim));
-      vi[1] = std::stof(strtok(NULL, delim));
-      vi[2] = std::stof(strtok(NULL, delim));
-      vVector.push_back(vi);
-
-      massVector.push_back(std::stof(strtok(NULL, delim)));
-
-      if (massVector.back()<=0.0 ) {
-        std::cerr << "invalid mass for body " << NumberOfBodies << std::endl;
-        exit(-2);
-      }
-      ptr = strtok(NULL, delim2);
-      //printf("%f %f %f %f %f %f %f\n", xi[0], xi[1], xi[2], vi[0], vi[1], vi[2], massVector.back());
-      NumberOfBodies ++;
-    }
-    x    = new double*[NumberOfBodies];
-    v    = new double*[NumberOfBodies];
-    mass = new double [NumberOfBodies];
-    for (int i=0; i<NumberOfBodies; i++) {
-      x[i] = xVector.at(i);
-      v[i] = vVector.at(i);
-      mass[i] = massVector.at(i);
-    }
-  } else {
-    NumberOfBodies = (argc-4) / 7;
-    x    = new double*[NumberOfBodies];
-    v    = new double*[NumberOfBodies];
-    mass = new double [NumberOfBodies];
-
-    for (int i=0; i<NumberOfBodies; i++) {
-      x[i] = new double[3];
-      v[i] = new double[3];
-
-      x[i][0] = std::stof(argv[readArgument]); readArgument++;
-      x[i][1] = std::stof(argv[readArgument]); readArgument++;
-      x[i][2] = std::stof(argv[readArgument]); readArgument++;
-
-      v[i][0] = std::stof(argv[readArgument]); readArgument++;
-      v[i][1] = std::stof(argv[readArgument]); readArgument++;
-      v[i][2] = std::stof(argv[readArgument]); readArgument++;
-
-      mass[i] = std::stof(argv[readArgument]); readArgument++;
-
-      if (mass[i]<=0.0 ) {
-        std::cerr << "invalid mass for body " << i << std::endl;
-        exit(-2);
-      }
     }
   }
 
@@ -234,68 +180,54 @@ void printParaviewSnapshot() {
  */
 void updateBody() {
   maxV   = 0.0;
-  double maxVSquared = 0.0;
   minDx  = std::numeric_limits<double>::max();
 
   // force0 = force along x direction
   // force1 = force along y direction
   // force2 = force along z direction
-  double force0[NumberOfBodies] = {0.0};
-  double force1[NumberOfBodies] = {0.0};
-  double force2[NumberOfBodies] = {0.0};
+  double* force0 = new double[NumberOfBodies];
+  double* force1 = new double[NumberOfBodies];
+  double* force2 = new double[NumberOfBodies];
 
-  for (int j=0; j<NumberOfBodies; j++) {
-    double fj0 = force0[j];
-    double fj1 = force1[j];
-    double fj2 = force2[j];
-    for (int i=j+1; i<NumberOfBodies; i++) {
-      const double distance = sqrt(
-        (x[j][0]-x[i][0]) * (x[j][0]-x[i][0]) +
-        (x[j][1]-x[i][1]) * (x[j][1]-x[i][1]) +
-        (x[j][2]-x[i][2]) * (x[j][2]-x[i][2])
-      );
+  force0[0] = 0.0;
+  force1[0] = 0.0;
+  force2[0] = 0.0;
 
-      // Calculate the forces between object i and j
-      double m1m2OverDistanceCubed = mass[i]*mass[j] / (distance * distance * distance);
-      const double f0 = (x[i][0]-x[j][0]) * m1m2OverDistanceCubed;
-      const double f1 = (x[i][1]-x[j][1]) * m1m2OverDistanceCubed;
-      const double f2 = (x[i][2]-x[j][2]) * m1m2OverDistanceCubed;
-
-      // Add forces to object j
-      // Optimise by eliminating array access for object j
-      fj0 += f0;
-      fj1 += f1;
-      fj2 += f2;
-      // Add equal and opposite force to object i
-      force0[i] -= f0; 
-      force1[i] -= f1; 
-      force2[i] -= f2; 
-
-      minDx = std::min( minDx,distance );
-    }
-
-    // Update velocity of object j
-    v[j][0] += timeStepSize * fj0 / mass[j];
-    v[j][1] += timeStepSize * fj1 / mass[j];
-    v[j][2] += timeStepSize * fj2 / mass[j];
-
-    // Update max velocity for this timestep
-    maxVSquared = std::max(
-      maxVSquared,
-      v[j][0]*v[j][0] + v[j][1]*v[j][1] + v[j][2]*v[j][2]
+  for (int i=1; i<NumberOfBodies; i++) {
+    const double distance = sqrt(
+      (x[0][0]-x[i][0]) * (x[0][0]-x[i][0]) +
+      (x[0][1]-x[i][1]) * (x[0][1]-x[i][1]) +
+      (x[0][2]-x[i][2]) * (x[0][2]-x[i][2])
     );
+
+    // x,y,z forces acting on particle 0
+    force0[0] += (x[i][0]-x[0][0]) * mass[i]*mass[0] / distance / distance / distance ;
+    force1[0] += (x[i][1]-x[0][1]) * mass[i]*mass[0] / distance / distance / distance ;
+    force2[0] += (x[i][2]-x[0][2]) * mass[i]*mass[0] / distance / distance / distance ;
+
+    minDx = std::min( minDx,distance );
   }
 
-  maxV = std::sqrt(maxVSquared);
+  x[0][0] = x[0][0] + timeStepSize * v[0][0];
+  x[0][1] = x[0][1] + timeStepSize * v[0][1];
+  x[0][2] = x[0][2] + timeStepSize * v[0][2];
 
-  // Update object positions
-  for (int i=0; i<NumberOfBodies; i++) {
-    x[i][0] += timeStepSize * v[i][0];
-    x[i][1] += timeStepSize * v[i][1];
-    x[i][2] += timeStepSize * v[i][2];
-  }
+  // These are three buggy lines of code that we will use in one of the labs
+//  x[0][3] = x[0][2] + timeStepSize * v[0][2];
+//  x[0][2] = x[0][2] + timeStepSize * v[0][2] / 0.0;
+//  x[50000000][1] = x[0][2] + timeStepSize * v[0][2] / 0.0;
+
+  v[0][0] = v[0][0] + timeStepSize * force0[0] / mass[0];
+  v[0][1] = v[0][1] + timeStepSize * force1[0] / mass[0];
+  v[0][2] = v[0][2] + timeStepSize * force2[0] / mass[0];
+
+  maxV = std::sqrt( v[0][0]*v[0][0] + v[0][1]*v[0][1] + v[0][2]*v[0][2] );
 
   t += timeStepSize;
+
+  delete[] force0;
+  delete[] force1;
+  delete[] force2;
 }
 
 
@@ -311,7 +243,8 @@ int main(int argc, char** argv) {
               << "  final-time      simulated time (greater 0)" << std::endl
               << "  dt              time step size (greater 0)" << std::endl
               << std::endl
-              << "Examples:" << std::endl << "0.01  100.0  0.001    0.0 0.0 0.0  1.0 0.0 0.0  1.0 \t One body moving form the coordinate system's centre along x axis with speed 1" << std::endl
+              << "Examples:" << std::endl
+              << "0.01  100.0  0.001    0.0 0.0 0.0  1.0 0.0 0.0  1.0 \t One body moving form the coordinate system's centre along x axis with speed 1" << std::endl
               << "0.01  100.0  0.001    0.0 0.0 0.0  1.0 0.0 0.0  1.0     0.0 1.0 0.0  1.0 0.0 0.0  1.0  \t One spiralling around the other one" << std::endl
               << "0.01  100.0  0.001    3.0 0.0 0.0  0.0 1.0 0.0  0.4     0.0 0.0 0.0  0.0 0.0 0.0  0.2     2.0 0.0 0.0  0.0 0.0 0.0  1.0 \t Three body setup from first lecture" << std::endl
               << "0.01  100.0  0.001    3.0 0.0 0.0  0.0 1.0 0.0  0.4     0.0 0.0 0.0  0.0 0.0 0.0  0.2     2.0 0.0 0.0  0.0 0.0 0.0  1.0     2.0 1.0 0.0  0.0 0.0 0.0  1.0     2.0 0.0 1.0  0.0 0.0 0.0  1.0 \t Five body setup" << std::endl
@@ -320,7 +253,7 @@ int main(int argc, char** argv) {
 
     return -1;
   }
-  else if ( !((argc-4)%7==0 || argc ==5 )) {
+  else if ( (argc-4)%7!=0 ) {
     std::cerr << "error in arguments: each planet is given by seven entries (position, velocity, mass)" << std::endl;
     std::cerr << "got " << argc << " arguments (three of them are reserved)" << std::endl;
     std::cerr << "run without arguments for usage instruction" << std::endl;
